@@ -1,0 +1,130 @@
+/* Golf-themed color palette and design system */
+:root {
+  /* Golf Green Palette */
+  --golf-green-50: #f0fdf4;
+  --golf-green-100: #dcfce7;
+  --golf-green-200: #bbf7d0;
+  --golf-green-300: #86efac;
+  --golf-green-400: #4ade80;
+  --golf-green-500: #22c55e;
+  --golf-green-600: #16a34a;
+  --golf-green-700: #15803d;
+  --golf-green-800: #166534;
+  --golf-green-900: #14532d;
+
+  /* Earth Tones */
+  --golf-sand-50: #fefce8;
+  --golf-sand-100: #fef3c7;
+  --golf-sand-200: #fde68a;
+  --golf-sand-300: #fcd34d;
+  --golf-sand-400: #fbbf24;
+  --golf-sand-500: #f59e0b;
+
+  /* Golf Course Colors */
+  --golf-fairway: var(--golf-green-500);
+  --golf-rough: var(--golf-green-700);
+  --golf-sand: var(--golf-sand-300);
+  --golf-sky: #0ea5e9;
+  --golf-white: #ffffff;
+  --golf-dark: #1f2937;
+}
+
+/* Golf-themed gradients */
+.golf-gradient-primary {
+  background: linear-gradient(135deg, var(--golf-green-400) 0%, var(--golf-green-600) 100%);
+}
+
+.golf-gradient-fairway {
+  background: linear-gradient(180deg, var(--golf-green-300) 0%, var(--golf-green-500) 50%, var(--golf-green-700) 100%);
+}
+
+.golf-gradient-sky {
+  background: linear-gradient(180deg, var(--golf-sky) 0%, var(--golf-green-200) 100%);
+}
+
+/* Golf-themed animations */
+@keyframes swing-path {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes golf-ball-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.swing-path-animation {
+  animation: swing-path 2s ease-in-out;
+}
+
+.golf-ball-bounce {
+  animation: golf-ball-bounce 0.6s ease-in-out infinite;
+}
+
+/* Golf-themed components */
+.golf-card {
+  @apply bg-white rounded-xl shadow-lg border border-golf-green-200 p-6;
+}
+
+.golf-button-primary {
+  @apply bg-golf-green-500 hover:bg-golf-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg;
+}
+
+.golf-button-secondary {
+  @apply bg-golf-sand-200 hover:bg-golf-sand-300 text-golf-dark font-semibold py-3 px-6 rounded-lg transition-colors duration-200;
+}
+
+.golf-input {
+  @apply border-2 border-golf-green-200 focus:border-golf-green-500 rounded-lg px-4 py-2 transition-colors duration-200;
+}
+
+/* Mobile-first responsive design */
+.golf-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.golf-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+/* Video player styling */
+.golf-video-container {
+  @apply relative rounded-xl overflow-hidden shadow-xl bg-golf-dark;
+}
+
+.golf-video-overlay {
+  @apply absolute inset-0 pointer-events-none;
+}
+
+/* Loading states */
+.golf-loading {
+  @apply animate-pulse bg-golf-green-200 rounded;
+}
+
+.golf-spinner {
+  @apply animate-spin rounded-full border-4 border-golf-green-200 border-t-golf-green-600;
+}
+
+/* Success states */
+.golf-success {
+  @apply bg-golf-green-50 border border-golf-green-200 text-golf-green-800 rounded-lg p-4;
+}
+
+/* Error states */
+.golf-error {
+  @apply bg-red-50 border border-red-200 text-red-800 rounded-lg p-4;
+}
+
+/* Dark mode support */
+.dark {
+  --golf-white: #1f2937;
+  --golf-dark: #ffffff;
+}
+
+.dark .golf-card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.dark .golf-input {
+  @apply bg-gray-800 border-gray-600 text-white;
+}

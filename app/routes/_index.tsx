@@ -1,4 +1,4 @@
-import { TestApp } from "../components/TestApp";
+import { ImprovedGolfApp } from "../components/ImprovedGolfApp";
 
 export function meta() {
   return [
@@ -7,10 +7,6 @@ export function meta() {
   ];
 }
 
-export function loader() {
-  return { message: "Golf Swing Analyzer Ready" };
-}
-
-export default function Home() {
-  return <TestApp />;
+export default function Index() {
+  return <ImprovedGolfApp />;
 }

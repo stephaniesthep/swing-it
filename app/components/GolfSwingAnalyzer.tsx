@@ -312,7 +312,7 @@ export function GolfSwingAnalyzer() {
                 <VideoRecorder
                   onVideoReady={handleVideoReady}
                   onStatusChange={setStatus}
-                  maxDuration={30}
+                  maxDuration={60}
                 />
               ) : (
                 <VideoUpload

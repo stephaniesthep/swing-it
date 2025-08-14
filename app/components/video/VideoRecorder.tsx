@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '../ui';
 import type { VideoSource, AnalysisStatus } from '../../lib/types';
-import { Camera, Square, Play, Pause } from 'lucide-react';
+import { Camera, Square, Play, Pause, RotateCcw, RotateCw } from 'lucide-react';
 
 interface VideoRecorderProps {
   onVideoReady: (videoBlob: Blob, videoUrl: string) => void;
@@ -12,19 +12,26 @@ interface VideoRecorderProps {
 export function VideoRecorder({ 
   onVideoReady, 
   onStatusChange, 
-  maxDuration = 30 
+  maxDuration = 60
 }: VideoRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [isMirrored, setIsMirrored] = useState(true);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
+
+  // Detect if device is mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // Request camera permission and setup stream
   const setupCamera = useCallback(async () => {
@@ -32,11 +39,32 @@ export function VideoRecorder({
       setError(null);
       onStatusChange('idle');
 
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      // Calculate optimal resolution based on orientation
+      let aspectRatio: number;
+      let baseWidth: number;
+      let baseHeight: number;
+      
+      if (orientation === 'portrait') {
+        aspectRatio = 9 / 16; // Portrait aspect ratio
+        baseHeight = 640; // Taller for portrait
+        baseWidth = Math.round(baseHeight * aspectRatio); // ≈ 360
+      } else {
+        aspectRatio = 16 / 9; // Landscape aspect ratio
+        baseHeight = 360; // Shorter for landscape
+        baseWidth = Math.round(baseHeight * aspectRatio); // ≈ 640
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
+          width: { ideal: baseWidth, min: 320, max: 640 },
+          height: { ideal: baseHeight, min: 280, max: 560 },
+          aspectRatio: aspectRatio,
+          facingMode: facingMode
         },
         audio: true
       });
@@ -52,7 +80,7 @@ export function VideoRecorder({
       setHasPermission(false);
       onStatusChange('error');
     }
-  }, [onStatusChange]);
+  }, [onStatusChange, facingMode, orientation]);
 
   // Start recording
   const startRecording = useCallback(() => {
@@ -80,19 +108,29 @@ export function VideoRecorder({
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start(100); // Collect data every 100ms
       setIsRecording(true);
-      setRecordingTime(0);
+      setRecordingTime(maxDuration);
       onStatusChange('recording');
 
-      // Start timer
+      // Record the exact start time
+      recordingStartTimeRef.current = Date.now();
+
+      // Start precise timer - check every 100ms for better accuracy
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => {
-          const newTime = prev + 1;
-          if (newTime >= maxDuration) {
+        if (recordingStartTimeRef.current) {
+          const elapsedMs = Date.now() - recordingStartTimeRef.current;
+          const elapsedSeconds = Math.floor(elapsedMs / 1000);
+          
+          // Set countdown time (maxDuration - elapsed time)
+          const remainingSeconds = Math.max(0, maxDuration - elapsedSeconds);
+          setRecordingTime(remainingSeconds);
+          
+          // Stop recording if we've reached or exceeded the maximum duration
+          // Use a small buffer (50ms) to ensure we don't go over
+          if (elapsedMs >= (maxDuration * 1000) - 50) {
             stopRecording();
           }
-          return newTime;
-        });
-      }, 1000);
+        }
+      }, 100); // Check every 100ms for precise timing
     } catch (err) {
       console.error('Recording error:', err);
       setError('Failed to start recording');
@@ -111,6 +149,9 @@ export function VideoRecorder({
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      
+      // Clear the start time reference
+      recordingStartTimeRef.current = null;
     }
   }, [isRecording]);
 
@@ -121,16 +162,29 @@ export function VideoRecorder({
     if (isPaused) {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      // Resume timer
+      
+      // Adjust start time to account for paused duration
+      if (recordingStartTimeRef.current) {
+        const pausedDuration = Date.now() - (recordingStartTimeRef.current + (recordingTime * 1000));
+        recordingStartTimeRef.current = Date.now() - (recordingTime * 1000);
+      }
+      
+      // Resume precise timer
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => {
-          const newTime = prev + 1;
-          if (newTime >= maxDuration) {
+        if (recordingStartTimeRef.current) {
+          const elapsedMs = Date.now() - recordingStartTimeRef.current;
+          const elapsedSeconds = Math.floor(elapsedMs / 1000);
+          
+          // Set countdown time (maxDuration - elapsed time)
+          const remainingSeconds = Math.max(0, maxDuration - elapsedSeconds);
+          setRecordingTime(remainingSeconds);
+          
+          // Stop recording if we've reached or exceeded the maximum duration
+          if (elapsedMs >= (maxDuration * 1000) - 50) {
             stopRecording();
           }
-          return newTime;
-        });
-      }, 1000);
+        }
+      }, 100);
     } else {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
@@ -139,7 +193,32 @@ export function VideoRecorder({
         timerRef.current = null;
       }
     }
-  }, [isPaused, maxDuration, stopRecording]);
+  }, [isPaused, maxDuration, stopRecording, recordingTime]);
+
+  // Flip camera (available on all devices)
+  const flipCamera = useCallback(async () => {
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    // Always mirror front camera, never mirror back camera
+    setIsMirrored(newFacingMode === 'user');
+    await setupCamera();
+  }, [facingMode, setupCamera]);
+
+  // Toggle mirror manually (only allow when using back camera)
+  const toggleMirror = useCallback(() => {
+    // Only allow manual mirror toggle for back camera
+    // Front camera should always be mirrored
+    if (facingMode === 'environment') {
+      setIsMirrored(prev => !prev);
+    }
+  }, [facingMode]);
+
+  // Toggle camera orientation
+  const toggleOrientation = useCallback(async () => {
+    const newOrientation = orientation === 'portrait' ? 'landscape' : 'portrait';
+    setOrientation(newOrientation);
+    await setupCamera();
+  }, [orientation, setupCamera]);
 
   // Format time display
   const formatTime = (seconds: number) => {
@@ -148,22 +227,71 @@ export function VideoRecorder({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Cleanup on unmount
+  // Cleanup media stream function
+  const cleanupMediaStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped ${track.kind} track`); // For debugging
+      });
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
+  // Browser event cleanup - ensures media streams are stopped when page is closed/hidden
   useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+    const handleBeforeUnload = () => {
+      cleanupMediaStream();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cleanupMediaStream();
       }
     };
-  }, []);
+
+    const handleBlur = () => {
+      cleanupMediaStream();
+    };
+
+    const handlePageHide = () => {
+      cleanupMediaStream();
+    };
+
+    // Add event listeners for various browser events
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('pagehide', handlePageHide);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pagehide', handlePageHide);
+      cleanupMediaStream();
+    };
+  }, [cleanupMediaStream]);
 
   // Setup camera on mount
   useEffect(() => {
     setupCamera();
   }, [setupCamera]);
+
+  // Ensure front camera is always mirrored
+  useEffect(() => {
+    if (facingMode === 'user') {
+      setIsMirrored(true);
+    }
+  }, [facingMode]);
 
   if (hasPermission === false) {
     return (
@@ -190,29 +318,91 @@ export function VideoRecorder({
 
   return (
     <div className="golf-card">
-      <div className="golf-video-container mb-4">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="w-full h-64 md:h-80 object-cover"
-        />
+      <div className="golf-video-container mb-4 relative">
+        <div
+          className="w-full rounded-lg overflow-hidden bg-black"
+          style={{
+            aspectRatio: orientation === 'portrait' ? '9/16' : '16/9',
+            maxWidth: '100%',
+            height: 'auto'
+          }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className={`w-full h-full ${(facingMode === 'user' || isMirrored) ? 'scale-x-[-1]' : 'scale-x-[1]'}`}
+            style={{
+              objectFit: 'cover',
+              objectPosition: 'center',
+              transform: (facingMode === 'user' || isMirrored) ? 'scaleX(-1)' : 'scaleX(1)',
+              WebkitTransform: (facingMode === 'user' || isMirrored) ? 'scaleX(-1)' : 'scaleX(1)',
+              MozTransform: (facingMode === 'user' || isMirrored) ? 'scaleX(-1)' : 'scaleX(1)',
+              msTransform: (facingMode === 'user' || isMirrored) ? 'scaleX(-1)' : 'scaleX(1)',
+              filter: 'none',
+              backfaceVisibility: 'hidden'
+            }}
+          />
+        </div>
         
-        {/* Recording indicator */}
-        {isRecording && (
-          <div className="absolute top-4 left-4 flex items-center space-x-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-white font-semibold bg-black bg-opacity-50 px-2 py-1 rounded">
-              REC {formatTime(recordingTime)}
-            </span>
+        {/* Camera mode indicator - positioned over video */}
+        <div className="absolute top-4 left-4 flex items-center space-x-2 z-[1001]" style={{
+          zIndex: 1001,
+          pointerEvents: 'none'
+        }}>
+          {isRecording && (
+            <>
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-white font-semibold bg-red-600 px-2 py-1 rounded text-sm shadow-lg border border-white/20">
+                REC {formatTime(recordingTime)}
+              </span>
+            </>
+          )}
+          <span className="text-white text-sm bg-blue-600 px-3 py-1 rounded font-medium shadow-lg border border-white/20">
+            {facingMode === 'user' ? 'FRONT (MIRRORED)' : 'BACK'} {facingMode === 'environment' && isMirrored ? '(FLIPPED)' : ''} - {orientation.toUpperCase()}
+          </span>
+        </div>
+
+        {/* Camera controls - positioned over video */}
+        {!isRecording && (
+          <div className="absolute top-4 right-4 flex space-x-2 z-[1001]" style={{ zIndex: 1001 }}>
+            <button
+              onClick={toggleOrientation}
+              className="p-3 bg-gray-900/80 backdrop-blur-sm text-white rounded-full hover:bg-gray-700/80 transition-all shadow-lg border-2 border-white/30"
+              title={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} orientation`}
+            >
+              <RotateCw className="w-5 h-5" />
+            </button>
+            <button
+              onClick={flipCamera}
+              className="p-3 bg-gray-900/80 backdrop-blur-sm text-white rounded-full hover:bg-gray-700/80 transition-all shadow-lg border-2 border-white/30"
+              title={`Switch to ${facingMode === 'user' ? 'back' : 'front'} camera`}
+            >
+              <RotateCcw className="w-5 h-5" />
+            </button>
+            {facingMode === 'environment' && (
+              <button
+                onClick={toggleMirror}
+                className="p-3 bg-gray-900/80 backdrop-blur-sm text-white rounded-full hover:bg-gray-700/80 transition-all shadow-lg border-2 border-white/30"
+                title={`${isMirrored ? 'Disable' : 'Enable'} manual mirror for back camera`}
+              >
+                <span className="text-sm font-bold">M</span>
+              </button>
+            )}
           </div>
         )}
 
-        {/* Max duration indicator */}
-        <div className="absolute top-4 right-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
-          Max: {formatTime(maxDuration)}
-        </div>
+        {/* Max duration indicator - positioned over video - only show when NOT recording */}
+        {!isRecording && (
+          <div className="absolute bottom-4 right-4 text-white bg-gray-900/80 backdrop-blur-sm px-3 py-1 rounded shadow-lg border border-white/20 z-[1001]" style={{
+            zIndex: 1001,
+            pointerEvents: 'none'
+          }}>
+            Max: {formatTime(maxDuration)}
+          </div>
+        )}
+
       </div>
 
       {/* Controls */}

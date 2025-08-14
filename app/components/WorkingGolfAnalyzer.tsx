@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface SwingAnalysis {
   smoothnessScore: number;
@@ -142,6 +142,24 @@ export function WorkingGolfAnalyzer() {
     analyzeSwing();
   }, [analyzeSwing]);
 
+  // Cleanup media stream function
+  const cleanupMediaStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped ${track.kind} track`); // For debugging
+      });
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
   const reset = () => {
     setVideoUrl(null);
     setAnalysis(null);
@@ -150,10 +168,44 @@ export function WorkingGolfAnalyzer() {
     setIsRecording(false);
     setRecordingTime(0);
     
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
+    cleanupMediaStream();
   };
+
+  // Browser event cleanup - ensures media streams are stopped when page is closed/hidden
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      cleanupMediaStream();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cleanupMediaStream();
+      }
+    };
+
+    const handleBlur = () => {
+      cleanupMediaStream();
+    };
+
+    const handlePageHide = () => {
+      cleanupMediaStream();
+    };
+
+    // Add event listeners for various browser events
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('pagehide', handlePageHide);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pagehide', handlePageHide);
+      cleanupMediaStream();
+    };
+  }, [cleanupMediaStream]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

@@ -1,4 +1,4 @@
-import { TestApp } from "../components/TestApp";
+import { GolfSwingAnalyzer } from "../components/GolfSwingAnalyzer";
 
 export function meta() {
   return [
@@ -12,5 +12,5 @@ export function loader() {
 }
 
 export default function Home() {
-  return <TestApp />;
+  return <GolfSwingAnalyzer />;
 }

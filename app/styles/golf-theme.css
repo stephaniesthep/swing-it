@@ -96,6 +96,24 @@
   @apply absolute inset-0 pointer-events-none;
 }
 
+/* Front camera mirror effect */
+.golf-video-mirror {
+  transform: scaleX(-1) !important;
+  -webkit-transform: scaleX(-1) !important;
+  -moz-transform: scaleX(-1) !important;
+  -ms-transform: scaleX(-1) !important;
+  -o-transform: scaleX(-1) !important;
+}
+
+/* Video mirror wrapper */
+.video-mirror-wrapper {
+  transform: scaleX(-1) !important;
+  -webkit-transform: scaleX(-1) !important;
+  -moz-transform: scaleX(-1) !important;
+  -ms-transform: scaleX(-1) !important;
+  -o-transform: scaleX(-1) !important;
+}
+
 /* Loading states */
 .golf-loading {
   @apply animate-pulse bg-golf-green-200 rounded;

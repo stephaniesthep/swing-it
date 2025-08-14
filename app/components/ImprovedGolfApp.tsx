@@ -21,6 +21,12 @@ export function ImprovedGolfApp() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment'); // Default to back camera
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  
+  // Drag and drop state
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [dragCounter, setDragCounter] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -120,18 +126,36 @@ export function ImprovedGolfApp() {
   }, []);
 
   // Setup camera with portrait orientation
-  const setupCamera = useCallback(async () => {
+  const setupCamera = useCallback(async (facing: 'user' | 'environment' = facingMode) => {
     try {
       setError(null);
       setCameraReady(false);
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      // Calculate optimal resolution based on orientation
+      let videoConstraints;
+      if (orientation === 'portrait') {
+        videoConstraints = {
           width: { ideal: 720 },  // Portrait: height > width
           height: { ideal: 1280 },
-          facingMode: 'user',
+          facingMode: facing,
           aspectRatio: { ideal: 9/16 } // Portrait aspect ratio
-        },
+        };
+      } else {
+        videoConstraints = {
+          width: { ideal: 1280 }, // Landscape: width > height
+          height: { ideal: 720 },
+          facingMode: facing,
+          aspectRatio: { ideal: 16/9 } // Landscape aspect ratio
+        };
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
         audio: true
       });
 
@@ -146,7 +170,21 @@ export function ImprovedGolfApp() {
       console.error('Camera error:', err);
       setError('Camera access denied. Please allow camera permissions and try again.');
     }
-  }, []);
+  }, [facingMode, orientation]);
+
+  // Flip camera between front and back
+  const flipCamera = useCallback(async () => {
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    await setupCamera(newFacingMode);
+  }, [facingMode, setupCamera]);
+
+  // Toggle camera orientation
+  const toggleOrientation = useCallback(async () => {
+    const newOrientation = orientation === 'portrait' ? 'landscape' : 'portrait';
+    setOrientation(newOrientation);
+    await setupCamera(facingMode);
+  }, [orientation, setupCamera, facingMode]);
 
   // Fixed recording functionality
   const startRecording = useCallback(async () => {
@@ -198,7 +236,7 @@ export function ImprovedGolfApp() {
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => {
           const newTime = prev + 1;
-          if (newTime >= 30) { // Auto-stop after 30 seconds
+          if (newTime >= 60) { // Auto-stop after 60 seconds
             stopRecording();
           }
           return newTime;
@@ -241,6 +279,89 @@ export function ImprovedGolfApp() {
     setError(null);
     analyzeSwing();
   }, [analyzeSwing]);
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only set drag active if we have files being dragged
+    if (e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      setDragCounter(prev => prev + 1);
+      setIsDragActive(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setDragCounter(prev => {
+      const newCount = prev - 1;
+      // Only deactivate when counter reaches 0
+      if (newCount <= 0) {
+        setIsDragActive(false);
+        return 0;
+      }
+      return newCount;
+    });
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Ensure drag state stays active during drag over
+    if (e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      setIsDragActive(true);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Reset drag state immediately
+    setIsDragActive(false);
+    setDragCounter(0);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      
+      if (!file.type.startsWith('video/')) {
+        setError('Please drop a video file');
+        return;
+      }
+
+      if (file.size > 100 * 1024 * 1024) {
+        setError('File too large. Maximum size: 100MB');
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      setVideoUrl(url);
+      setError(null);
+      analyzeSwing();
+    }
+  }, [analyzeSwing]);
+
+  // Cleanup media stream function
+  const cleanupMediaStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped ${track.kind} track`); // For debugging
+      });
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
 
   // Draw swing path overlay on video
   const drawSwingPath = useCallback(() => {
@@ -320,6 +441,42 @@ export function ImprovedGolfApp() {
     }
   }, [analysis, videoUrl, drawSwingPath]);
 
+  // Browser event cleanup - ensures media streams are stopped when page is closed/hidden
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      cleanupMediaStream();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cleanupMediaStream();
+      }
+    };
+
+    const handleBlur = () => {
+      cleanupMediaStream();
+    };
+
+    const handlePageHide = () => {
+      cleanupMediaStream();
+    };
+
+    // Add event listeners for various browser events
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('pagehide', handlePageHide);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pagehide', handlePageHide);
+      cleanupMediaStream();
+    };
+  }, [cleanupMediaStream]);
+
   const reset = () => {
     setVideoUrl(null);
     setAnalysis(null);
@@ -328,16 +485,9 @@ export function ImprovedGolfApp() {
     setIsRecording(false);
     setRecordingTime(0);
     setCameraReady(false);
+    setFacingMode('environment'); // Reset to back camera
     
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    cleanupMediaStream();
   };
 
   const formatTime = (seconds: number) => {
@@ -457,10 +607,10 @@ export function ImprovedGolfApp() {
                     borderRadius: '8px',
                     overflow: 'hidden',
                     marginBottom: '16px',
-                    aspectRatio: '9/16', // Portrait aspect ratio
-                    maxHeight: '400px',
+                    aspectRatio: orientation === 'portrait' ? '9/16' : '16/9',
+                    maxHeight: orientation === 'portrait' ? '400px' : '300px',
                     width: '100%',
-                    maxWidth: '280px',
+                    maxWidth: orientation === 'portrait' ? '280px' : '500px',
                     margin: '0 auto 16px auto' // Center the video container
                   }}>
                     <video
@@ -468,10 +618,14 @@ export function ImprovedGolfApp() {
                       autoPlay
                       muted
                       playsInline
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover'
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                        WebkitTransform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                        MozTransform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                        msTransform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
                       }}
                     />
                     {!cameraReady && (
@@ -498,45 +652,138 @@ export function ImprovedGolfApp() {
                         </div>
                       </div>
                     )}
-                    {isRecording && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '16px',
-                        left: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <div style={{
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#ef4444',
-                          borderRadius: '50%',
-                          animation: 'pulse 2s infinite'
-                        }}></div>
-                        <span style={{
-                          color: 'white',
-                          fontWeight: '600',
-                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                          padding: '4px 8px',
-                          borderRadius: '4px'
-                        }}>
-                          REC {formatTime(recordingTime)}
-                        </span>
-                      </div>
-                    )}
+                    {/* Camera status indicator */}
                     <div style={{
                       position: 'absolute',
                       top: '16px',
-                      right: '16px',
-                      color: 'white',
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '0.875rem'
+                      left: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      zIndex: 1001
                     }}>
-                      Max: 30s
+                      {isRecording && (
+                        <>
+                          <div style={{
+                            width: '12px',
+                            height: '12px',
+                            backgroundColor: '#ef4444',
+                            borderRadius: '50%',
+                            animation: 'pulse 2s infinite'
+                          }}></div>
+                          <span style={{
+                            color: 'white',
+                            fontWeight: '600',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255, 255, 255, 0.2)'
+                          }}>
+                            REC {formatTime(recordingTime)}
+                          </span>
+                        </>
+                      )}
+                      {!isRecording && (
+                        <>
+                          <button
+                            onClick={toggleOrientation}
+                            disabled={!cameraReady}
+                            style={{
+                              color: 'white',
+                              fontSize: '1rem',
+                              fontWeight: '600',
+                              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                              padding: '6px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: cameraReady ? 'pointer' : 'not-allowed',
+                              opacity: cameraReady ? 1 : 0.6,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              marginRight: '8px'
+                            }}
+                            title={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} orientation`}
+                          >
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              {/* Phone in center */}
+                              <rect x="8" y="6" width="8" height="12" rx="2"/>
+                              <path d="M10 8h4"/>
+                              <path d="M12 16v1"/>
+                              
+                              {/* Circular rotation arrows around phone */}
+                              <path d="M4 12c0-4.4 3.6-8 8-8"/>
+                              <path d="M20 12c0 4.4-3.6 8-8 8"/>
+                              
+                              {/* Arrow heads */}
+                              <path d="M6 8l-2 2 2 2"/>
+                              <path d="M18 16l2-2-2-2"/>
+                            </svg>
+                          </button>
+                          <button
+                            onClick={flipCamera}
+                            disabled={!cameraReady}
+                            style={{
+                              color: 'white',
+                              fontSize: '1rem',
+                              fontWeight: '600',
+                              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                              padding: '6px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: cameraReady ? 'pointer' : 'not-allowed',
+                              opacity: cameraReady ? 1 : 0.6,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px'
+                            }}
+                            title="Tap to flip camera"
+                          >
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              stroke="none"
+                            >
+                              {/* Two circular refresh arrows with arrowheads */}
+                              <path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6z"/>
+                              <path d="M12 18v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26L17.3 9.2c.45.83.7 1.79.7 2.8 0 3.31-2.69 6-6 6z"/>
+                            </svg>
+                          </button>
+                        </>
+                      )}
                     </div>
+                    
+                    {/* Max duration indicator - only show when NOT recording */}
+                    {!isRecording && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '16px',
+                        right: '16px',
+                        color: 'white',
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.875rem',
+                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                      }}>
+                        Max: 60s
+                      </div>
+                    )}
                   </div>
                   
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
@@ -577,18 +824,52 @@ export function ImprovedGolfApp() {
                 </div>
               ) : (
                 <div>
-                  <div style={{
-                    border: '2px dashed #22c55e',
-                    borderRadius: '8px',
-                    padding: '32px',
-                    textAlign: 'center'
-                  }}>
+                  <div
+                    style={{
+                      border: `2px dashed ${isDragActive ? '#16a34a' : '#22c55e'}`,
+                      borderRadius: '8px',
+                      padding: '32px',
+                      textAlign: 'center',
+                      backgroundColor: isDragActive ? '#f0fdf4' : 'transparent',
+                      transition: 'all 0.2s ease-in-out',
+                      transform: isDragActive ? 'scale(1.02)' : 'scale(1)',
+                      boxShadow: isDragActive ? '0 8px 25px -8px rgba(34, 197, 94, 0.3)' : 'none'
+                    }}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                  >
                     <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📁</div>
-                      <p style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                        Upload your golf swing video
+                      <div style={{
+                        fontSize: '3rem',
+                        marginBottom: '16px',
+                        transform: isDragActive ? 'scale(1.1)' : 'scale(1)',
+                        transition: 'transform 0.2s ease-in-out'
+                      }}>
+                        {isDragActive ? '🎯' : '📁'}
+                      </div>
+                      <p style={{
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        color: isDragActive ? '#16a34a' : '#374151',
+                        marginBottom: '8px',
+                        transition: 'color 0.2s ease-in-out'
+                      }}>
+                        {isDragActive ? 'Drop your golf swing video here!' : 'Upload your golf swing video'}
                       </p>
-                      <p style={{ color: '#6b7280', marginBottom: '16px' }}>
+                      <p style={{
+                        color: isDragActive ? '#16a34a' : '#6b7280',
+                        marginBottom: '16px',
+                        transition: 'color 0.2s ease-in-out'
+                      }}>
+                        {isDragActive ? 'Release to upload' : 'Drag & drop or click to browse'}
+                      </p>
+                      <p style={{
+                        color: '#9ca3af',
+                        fontSize: '0.875rem',
+                        marginBottom: '16px'
+                      }}>
                         Supported formats: MP4, WebM, MOV (max 100MB)
                       </p>
                     </div>
@@ -602,13 +883,15 @@ export function ImprovedGolfApp() {
                     <label
                       htmlFor="video-upload"
                       style={{
-                        backgroundColor: '#22c55e',
+                        backgroundColor: isDragActive ? '#16a34a' : '#22c55e',
                         color: 'white',
                         fontWeight: '600',
                         padding: '12px 24px',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        display: 'inline-block'
+                        display: 'inline-block',
+                        transition: 'background-color 0.2s ease-in-out',
+                        transform: isDragActive ? 'scale(1.05)' : 'scale(1)'
                       }}
                     >
                       Choose Video File
@@ -656,22 +939,6 @@ export function ImprovedGolfApp() {
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>Swing Tempo</div>
                   </div>
-
-                  <button
-                    onClick={reset}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#6b7280',
-                      color: 'white',
-                      fontWeight: '600',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🔄 New Analysis
-                  </button>
                 </div>
               ) : status === 'processing' ? (
                 <div style={{ textAlign: 'center', padding: '32px 0' }}>
@@ -804,9 +1071,9 @@ export function ImprovedGolfApp() {
                   controls
                   style={{
                     width: '100%',
-                    maxWidth: '300px',
                     borderRadius: '8px',
-                    aspectRatio: '9/16',
+                    aspectRatio: orientation === 'portrait' ? '9/16' : '16/9',
+                    maxWidth: orientation === 'portrait' ? '300px' : '500px',
                     objectFit: 'cover'
                   }}
                 />
@@ -824,6 +1091,28 @@ export function ImprovedGolfApp() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* New Analysis Button - After Your Gold Swing */}
+        {analysis && videoUrl && (
+          <div style={{ marginTop: '24px', width: '100%', maxWidth: '400px', margin: '24px auto 0' }}>
+            <button
+              onClick={reset}
+              style={{
+                width: '100%',
+                backgroundColor: '#6b7280',
+                color: 'white',
+                fontWeight: '600',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              🔄 New Analysis
+            </button>
           </div>
         )}
 

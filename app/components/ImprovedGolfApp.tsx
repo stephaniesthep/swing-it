@@ -354,6 +354,8 @@ export function ImprovedGolfApp() {
       });
       streamRef.current = null;
     }
+    // Reset camera ready state when stream is cleaned up
+    setCameraReady(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -628,27 +630,61 @@ export function ImprovedGolfApp() {
                         msTransform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
                       }}
                     />
-                    {!cameraReady && (
+                    {(!cameraReady || !streamRef.current) && (
                       <div style={{
                         position: 'absolute',
                         inset: '0',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
                         color: 'white'
                       }}>
                         <div style={{ textAlign: 'center' }}>
-                          <div style={{
-                            width: '32px',
-                            height: '32px',
-                            border: '2px solid #e5e7eb',
-                            borderTop: '2px solid #22c55e',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite',
-                            margin: '0 auto 16px'
-                          }}></div>
-                          <p>Setting up camera...</p>
+                          <button
+                            onClick={() => setupCamera()}
+                            style={{
+                              backgroundColor: '#22c55e',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '80px',
+                              height: '80px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: '0 auto 16px',
+                              fontSize: '24px',
+                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.1)';
+                              e.currentTarget.style.backgroundColor = '#16a34a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = '#22c55e';
+                            }}
+                            title="Click to activate camera"
+                          >
+                            <svg
+                              width="32"
+                              height="32"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              stroke="none"
+                            >
+                              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                          </button>
+                          <p style={{ margin: '0', fontSize: '16px', fontWeight: '500' }}>
+                            Camera Inactive
+                          </p>
+                          <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: '0.8' }}>
+                            Click to activate camera
+                          </p>
                         </div>
                       </div>
                     )}
@@ -683,11 +719,10 @@ export function ImprovedGolfApp() {
                           </span>
                         </>
                       )}
-                      {!isRecording && (
+                      {!isRecording && cameraReady && streamRef.current && (
                         <>
                           <button
                             onClick={toggleOrientation}
-                            disabled={!cameraReady}
                             style={{
                               color: 'white',
                               fontSize: '1rem',
@@ -696,8 +731,7 @@ export function ImprovedGolfApp() {
                               padding: '6px',
                               borderRadius: '4px',
                               border: 'none',
-                              cursor: cameraReady ? 'pointer' : 'not-allowed',
-                              opacity: cameraReady ? 1 : 0.6,
+                              cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -733,7 +767,6 @@ export function ImprovedGolfApp() {
                           </button>
                           <button
                             onClick={flipCamera}
-                            disabled={!cameraReady}
                             style={{
                               color: 'white',
                               fontSize: '1rem',
@@ -742,8 +775,7 @@ export function ImprovedGolfApp() {
                               padding: '6px',
                               borderRadius: '4px',
                               border: 'none',
-                              cursor: cameraReady ? 'pointer' : 'not-allowed',
-                              opacity: cameraReady ? 1 : 0.6,
+                              cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -768,8 +800,8 @@ export function ImprovedGolfApp() {
                       )}
                     </div>
                     
-                    {/* Max duration indicator - only show when NOT recording */}
-                    {!isRecording && (
+                    {/* Max duration indicator - only show when NOT recording and camera is active */}
+                    {!isRecording && cameraReady && streamRef.current && (
                       <div style={{
                         position: 'absolute',
                         bottom: '16px',

@@ -15,6 +15,7 @@ export function WorkingGolfAnalyzer() {
   const [error, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -59,6 +60,13 @@ export function WorkingGolfAnalyzer() {
   const setupCamera = useCallback(async () => {
     try {
       setError(null);
+      setCameraReady(false);
+      
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 1280, height: 720, facingMode: 'user' },
         audio: true
@@ -67,9 +75,13 @@ export function WorkingGolfAnalyzer() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setCameraReady(true);
+        };
       }
     } catch (err) {
       setError('Camera access denied. Please allow camera permissions.');
+      setCameraReady(false);
       console.error('Camera error:', err);
     }
   }, []);
@@ -151,6 +163,8 @@ export function WorkingGolfAnalyzer() {
       });
       streamRef.current = null;
     }
+    // Reset camera ready state when stream is cleaned up
+    setCameraReady(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -206,6 +220,13 @@ export function WorkingGolfAnalyzer() {
       cleanupMediaStream();
     };
   }, [cleanupMediaStream]);
+
+  // Setup camera on mount
+  useEffect(() => {
+    if (activeTab === 'camera') {
+      setupCamera();
+    }
+  }, [activeTab, setupCamera]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -284,8 +305,35 @@ export function WorkingGolfAnalyzer() {
                       muted
                       playsInline
                       className="w-full h-64 object-cover"
-                      onLoadedMetadata={setupCamera}
                     />
+                    {(!cameraReady || !streamRef.current) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 text-white">
+                        <div className="text-center">
+                          <button
+                            onClick={() => setupCamera()}
+                            className="w-20 h-20 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center mb-4 mx-auto transition-all duration-200 hover:scale-110 shadow-lg text-2xl"
+                            title="Click to activate camera"
+                          >
+                            <svg
+                              width="32"
+                              height="32"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="23 4 23 10 17 10"/>
+                              <polyline points="1 20 1 14 7 14"/>
+                              <path d="m3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                          </button>
+                          <p className="font-medium mb-2">Camera Inactive</p>
+                          <p className="text-white text-opacity-80 text-sm">Click to activate camera</p>
+                        </div>
+                      </div>
+                    )}
                     {isRecording && (
                       <div className="absolute top-4 left-4 flex items-center space-x-2">
                         <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>

@@ -364,8 +364,8 @@ export function VideoRecorder({
           </span>
         </div>
 
-        {/* Camera controls - positioned over video */}
-        {!isRecording && (
+        {/* Camera controls - positioned over video - only show when camera is ready and stream is active */}
+        {!isRecording && hasPermission === true && streamRef.current && (
           <div className="absolute top-4 right-4 flex space-x-2 z-[1001]" style={{ zIndex: 1001 }}>
             <button
               onClick={toggleOrientation}
@@ -393,8 +393,33 @@ export function VideoRecorder({
           </div>
         )}
 
-        {/* Max duration indicator - positioned over video - only show when NOT recording */}
-        {!isRecording && (
+        {/* Refresh button overlay when camera is inactive */}
+        {hasPermission === true && !streamRef.current && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-[1002]">
+            <div className="text-center">
+              <button
+                onClick={() => setupCamera()}
+                className="w-20 h-20 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center mb-4 mx-auto transition-all duration-200 hover:scale-110 shadow-lg"
+                title="Click to activate camera"
+              >
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  stroke="none"
+                >
+                  <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                </svg>
+              </button>
+              <p className="text-white font-medium mb-2">Camera Inactive</p>
+              <p className="text-white/80 text-sm">Click to activate camera</p>
+            </div>
+          </div>
+        )}
+
+        {/* Max duration indicator - positioned over video - only show when NOT recording and stream is active */}
+        {!isRecording && streamRef.current && (
           <div className="absolute bottom-4 right-4 text-white bg-gray-900/80 backdrop-blur-sm px-3 py-1 rounded shadow-lg border border-white/20 z-[1001]" style={{
             zIndex: 1001,
             pointerEvents: 'none'

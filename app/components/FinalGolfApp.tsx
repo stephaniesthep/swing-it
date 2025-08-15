@@ -13,6 +13,7 @@ export function FinalGolfApp() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -50,6 +51,13 @@ export function FinalGolfApp() {
   const setupCamera = useCallback(async () => {
     try {
       setError(null);
+      setCameraReady(false);
+      
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 1280, height: 720 },
         audio: true
@@ -58,9 +66,13 @@ export function FinalGolfApp() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setCameraReady(true);
+        };
       }
     } catch (err) {
       setError('Camera access denied. Please allow camera permissions.');
+      setCameraReady(false);
     }
   }, []);
 
@@ -138,6 +150,8 @@ export function FinalGolfApp() {
       });
       streamRef.current = null;
     }
+    // Reset camera ready state when stream is cleaned up
+    setCameraReady(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -193,6 +207,13 @@ export function FinalGolfApp() {
       cleanupMediaStream();
     };
   }, [cleanupMediaStream]);
+
+  // Setup camera on mount
+  useEffect(() => {
+    if (activeTab === 'camera') {
+      setupCamera();
+    }
+  }, [activeTab, setupCamera]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -307,8 +328,65 @@ export function FinalGolfApp() {
                       muted
                       playsInline
                       style={{ width: '100%', height: '256px', objectFit: 'cover' }}
-                      onLoadedMetadata={setupCamera}
                     />
+                    {(!cameraReady || !streamRef.current) && (
+                      <div style={{
+                        position: 'absolute',
+                        inset: '0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        color: 'white'
+                      }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <button
+                            onClick={() => setupCamera()}
+                            style={{
+                              backgroundColor: '#22c55e',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '80px',
+                              height: '80px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: '0 auto 16px',
+                              fontSize: '24px',
+                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.1)';
+                              e.currentTarget.style.backgroundColor = '#16a34a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = '#22c55e';
+                            }}
+                            title="Click to activate camera"
+                          >
+                            <svg
+                              width="32"
+                              height="32"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              stroke="none"
+                            >
+                              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                          </button>
+                          <p style={{ margin: '0', fontSize: '16px', fontWeight: '500' }}>
+                            Camera Inactive
+                          </p>
+                          <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: '0.8' }}>
+                            Click to activate camera
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {isRecording && (
                       <div style={{
                         position: 'absolute',

@@ -318,15 +318,10 @@ export function WorkingGolfAnalyzer() {
                               width="32"
                               height="32"
                               viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                              fill="currentColor"
+                              stroke="none"
                             >
-                              <polyline points="23 4 23 10 17 10"/>
-                              <polyline points="1 20 1 14 7 14"/>
-                              <path d="m3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
                             </svg>
                           </button>
                           <p className="font-medium mb-2">Camera Inactive</p>

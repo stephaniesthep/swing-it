@@ -997,89 +997,6 @@ export function ImprovedGolfApp() {
           </div>
         </div>
 
-        {/* Detailed AI Recommendations - Centered */}
-        {analysis?.recommendations && (
-          <div style={{ marginTop: '32px', width: '100%', maxWidth: '500px', margin: '32px auto 0' }}>
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '12px', 
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-              padding: '24px' 
-            }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
-                 Analysis & Recommendations
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {analysis.recommendations.map((rec, index) => (
-                  <div key={index} style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    borderLeft: `4px solid ${getPriorityColor(rec.priority)}`
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                      <h4 style={{ 
-                        fontWeight: '600', 
-                        color: '#1f2937',
-                        margin: '0',
-                        marginRight: '8px'
-                      }}>
-                        {rec.category}
-                      </h4>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        color: getPriorityColor(rec.priority),
-                        backgroundColor: `${getPriorityColor(rec.priority)}20`,
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        textTransform: 'uppercase'
-                      }}>
-                        {rec.priority}
-                      </span>
-                    </div>
-                    
-                    <p style={{ 
-                      fontWeight: '500', 
-                      color: '#374151', 
-                      marginBottom: '8px',
-                      fontSize: '0.9rem'
-                    }}>
-                      {rec.issue}
-                    </p>
-                    
-                    <p style={{ 
-                      color: '#6b7280', 
-                      marginBottom: '12px',
-                      fontSize: '0.875rem',
-                      lineHeight: '1.5'
-                    }}>
-                      {rec.explanation}
-                    </p>
-                    
-                    <div style={{
-                      backgroundColor: '#f9fafb',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      borderLeft: '3px solid #22c55e'
-                    }}>
-                      <p style={{ 
-                        color: '#374151', 
-                        margin: '0',
-                        fontSize: '0.875rem',
-                        fontWeight: '500'
-                      }}>
-                        💡 <strong>How to improve:</strong> {rec.improvement}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Video Player with Overlay - Centered */}
         {videoUrl && (
           <div style={{ marginTop: '32px', width: '100%', maxWidth: '500px', margin: '32px auto 0' }}>
@@ -1121,6 +1038,89 @@ export function ImprovedGolfApp() {
                     }}
                   />
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Detailed AI Recommendations - Centered */}
+        {analysis?.recommendations && (
+          <div style={{ marginTop: '32px', width: '100%', maxWidth: '500px', margin: '32px auto 0' }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+              padding: '24px'
+            }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
+                 Analysis & Recommendations
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {analysis.recommendations.map((rec, index) => (
+                  <div key={index} style={{
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    borderLeft: `4px solid ${getPriorityColor(rec.priority)}`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                      <h4 style={{
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        margin: '0',
+                        marginRight: '8px'
+                      }}>
+                        {rec.category}
+                      </h4>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        color: getPriorityColor(rec.priority),
+                        backgroundColor: `${getPriorityColor(rec.priority)}20`,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        textTransform: 'uppercase'
+                      }}>
+                        {rec.priority}
+                      </span>
+                    </div>
+                    
+                    <p style={{
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '8px',
+                      fontSize: '0.9rem'
+                    }}>
+                      {rec.issue}
+                    </p>
+                    
+                    <p style={{
+                      color: '#6b7280',
+                      marginBottom: '12px',
+                      fontSize: '0.875rem',
+                      lineHeight: '1.5'
+                    }}>
+                      {rec.explanation}
+                    </p>
+                    
+                    <div style={{
+                      backgroundColor: '#f9fafb',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      borderLeft: '3px solid #22c55e'
+                    }}>
+                      <p style={{
+                        color: '#374151',
+                        margin: '0',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}>
+                        💡 <strong>How to improve:</strong> {rec.improvement}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

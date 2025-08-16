@@ -418,6 +418,19 @@ export function WorkingGolfAnalyzer() {
                     <div className="text-sm text-gray-600">Swing Tempo</div>
                   </div>
 
+                  {/* Video Player - Swing Path Analysis */}
+                  {videoUrl && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold text-gray-700 mb-3">🎬 Your Golf Swing - With Swing Path Analysis</h4>
+                      <video
+                        src={videoUrl}
+                        controls
+                        className="w-full rounded-lg"
+                        style={{ maxHeight: '200px' }}
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Recommendations:</h4>
                     <div className="space-y-2">
@@ -450,22 +463,6 @@ export function WorkingGolfAnalyzer() {
           </div>
         </div>
 
-        {/* Video Player */}
-        {videoUrl && (
-          <div className="mt-8">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                🎬 Your Golf Swing
-              </h3>
-              <video
-                src={videoUrl}
-                controls
-                className="w-full max-w-2xl mx-auto rounded-lg"
-                style={{ maxHeight: '400px' }}
-              />
-            </div>
-          </div>
-        )}
 
         {/* Error Display */}
         {error && (

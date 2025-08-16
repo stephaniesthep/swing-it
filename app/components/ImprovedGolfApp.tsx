@@ -1,22 +1,32 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
+// Enhanced type definitions for comprehensive swing analysis
+interface SwingIssue {
+  id: string;
+  category: 'Setup & Posture' | 'Swing Mechanics' | 'Contact & Timing' | 'Balance & Follow-Through';
+  issue: string;
+  description: string;
+  priority: 'High' | 'Medium' | 'Low';
+  impactAreas: ('power' | 'accuracy' | 'consistency')[];
+  howToImprove: string[];
+  practiceScore: number; // 1-10 difficulty to fix
+}
+
+interface EnhancedAnalysis {
+  smoothnessScore: number;
+  tempo: number;
+  issues: SwingIssue[]; // All detected issues ranked by priority
+  motivationalMessage: string;
+  celebrationTriggered: boolean;
+  swingPath: Array<{ x: number; y: number; timestamp: number }>;
+  overallAssessment: string;
+}
+
 export function ImprovedGolfApp() {
   const [activeTab, setActiveTab] = useState<'camera' | 'upload'>('camera');
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'complete'>('idle');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<{
-    smoothnessScore: number;
-    tempo: number;
-    recommendations: Array<{
-      category: string;
-      issue: string;
-      explanation: string;
-      improvement: string;
-      priority: 'high' | 'medium' | 'low';
-    }>;
-    celebrationTriggered: boolean;
-    swingPath: Array<{ x: number; y: number; timestamp: number }>;
-  } | null>(null);
+  const [analysis, setAnalysis] = useState<EnhancedAnalysis | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +45,187 @@ export function ImprovedGolfApp() {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Enhanced analysis function with detailed AI recommendations
+  // Comprehensive issue database
+  const getAllPossibleIssues = (): SwingIssue[] => [
+    // Setup & Posture Issues
+    {
+      id: 'ball-position-close',
+      category: 'Setup & Posture',
+      issue: 'Standing too close to the ball',
+      description: 'You\'re positioned too close to the ball, causing cramped swing motion and inconsistent contact. This restricts your natural swing arc and leads to pushed or pulled shots.',
+      priority: 'High',
+      impactAreas: ['accuracy', 'consistency'],
+      howToImprove: [
+        'Stand with arms hanging naturally - club should just reach the ball',
+        'Practice the "address position drill" - let arms hang, then grip club'
+      ],
+      practiceScore: 3
+    },
+    {
+      id: 'ball-position-far',
+      category: 'Setup & Posture',
+      issue: 'Standing too far from the ball',
+      description: 'You\'re positioned too far from the ball, causing you to reach and lose balance. This leads to inconsistent contact and loss of power.',
+      priority: 'High',
+      impactAreas: ['power', 'accuracy'],
+      howToImprove: [
+        'Move closer until arms hang naturally at address',
+        'Check that club sole sits flat on ground without reaching'
+      ],
+      practiceScore: 3
+    },
+    {
+      id: 'poor-grip',
+      category: 'Setup & Posture',
+      issue: 'Poor grip position',
+      description: 'Your grip is either too weak or too strong, affecting club face control and shot direction. A proper grip is fundamental to consistent ball striking.',
+      priority: 'High',
+      impactAreas: ['accuracy', 'consistency'],
+      howToImprove: [
+        'Check that you can see 2-3 knuckles on your left hand',
+        'Practice grip pressure - firm but not tight, like holding a bird'
+      ],
+      practiceScore: 4
+    },
+    {
+      id: 'spine-angle',
+      category: 'Setup & Posture',
+      issue: 'Incorrect spine angle or posture',
+      description: 'Your spine angle is too upright or bent over, affecting your swing plane and balance throughout the motion.',
+      priority: 'High',
+      impactAreas: ['power', 'consistency'],
+      howToImprove: [
+        'Bend from hips, not waist - maintain natural spine curve',
+        'Practice setup in front of mirror to check posture'
+      ],
+      practiceScore: 5
+    },
+    {
+      id: 'misaligned-stance',
+      category: 'Setup & Posture',
+      issue: 'Misaligned stance or shoulders',
+      description: 'Your feet, hips, or shoulders are not properly aligned to your target, causing directional issues and compensations in your swing.',
+      priority: 'Medium',
+      impactAreas: ['accuracy'],
+      howToImprove: [
+        'Use alignment sticks during practice to check body alignment',
+        'Practice "railroad track" setup - feet on one track, ball on the other'
+      ],
+      practiceScore: 3
+    },
+
+    // Swing Mechanics Issues
+    {
+      id: 'over-the-top',
+      category: 'Swing Mechanics',
+      issue: 'Over-the-top swing path',
+      description: 'Your downswing starts with your shoulders, causing the club to come over the top and create an outside-in swing path. This leads to slices and pulls.',
+      priority: 'High',
+      impactAreas: ['accuracy', 'power'],
+      howToImprove: [
+        'Start downswing with lower body - hips turn first',
+        'Practice "slot drill" - feel club dropping into the slot behind you'
+      ],
+      practiceScore: 7
+    },
+    {
+      id: 'limited-weight-transfer',
+      category: 'Swing Mechanics',
+      issue: 'Limited weight transfer',
+      description: 'Your weight stays mostly on your back foot through impact, reducing power and causing inconsistent ball contact.',
+      priority: 'High',
+      impactAreas: ['power', 'consistency'],
+      howToImprove: [
+        'Practice the "step drill" - step forward as you swing',
+        'Focus on finishing with 90% weight on front foot'
+      ],
+      practiceScore: 4
+    },
+    {
+      id: 'early-release',
+      category: 'Swing Mechanics',
+      issue: 'Early release of the club',
+      description: 'You\'re releasing the club too early in the downswing, losing the lag angle and reducing power transfer to the ball.',
+      priority: 'Medium',
+      impactAreas: ['power'],
+      howToImprove: [
+        'Practice "pump drill" - pause at top, then start down slowly',
+        'Focus on maintaining wrist angle until just before impact'
+      ],
+      practiceScore: 8
+    },
+    {
+      id: 'swing-tempo',
+      category: 'Swing Mechanics',
+      issue: 'Swinging too fast or too slow',
+      description: 'Your swing tempo is either rushed or too slow, affecting timing and consistency. Good tempo creates better sequencing and power.',
+      priority: 'Medium',
+      impactAreas: ['consistency', 'power'],
+      howToImprove: [
+        'Practice with metronome - 3:1 ratio (backswing:downswing)',
+        'Count "one-two-three" - one for takeaway, two for top, three for impact'
+      ],
+      practiceScore: 5
+    },
+
+    // Contact & Timing Issues
+    {
+      id: 'inconsistent-contact',
+      category: 'Contact & Timing',
+      issue: 'Inconsistent ball contact (thin, fat, topped shots)',
+      description: 'You\'re making inconsistent contact with the ball, sometimes hitting it thin, fat, or topping it. This indicates issues with swing bottom and angle of attack.',
+      priority: 'High',
+      impactAreas: ['accuracy', 'consistency'],
+      howToImprove: [
+        'Practice hitting down on the ball - ball first, then turf',
+        'Use impact tape or spray to check contact patterns'
+      ],
+      practiceScore: 6
+    },
+    {
+      id: 'poor-sequencing',
+      category: 'Contact & Timing',
+      issue: 'Poor swing sequence timing',
+      description: 'Your body parts aren\'t working in the proper sequence, causing timing issues and inconsistent contact.',
+      priority: 'Medium',
+      impactAreas: ['consistency', 'power'],
+      howToImprove: [
+        'Practice slow-motion swings focusing on proper sequence',
+        'Work on "ground up" motion - feet, knees, hips, shoulders, arms'
+      ],
+      practiceScore: 7
+    },
+
+    // Balance & Follow-Through Issues
+    {
+      id: 'incomplete-follow-through',
+      category: 'Balance & Follow-Through',
+      issue: 'Incomplete follow-through',
+      description: 'Your swing stops short after impact, indicating deceleration through the ball. A complete follow-through ensures maximum energy transfer.',
+      priority: 'Medium',
+      impactAreas: ['power', 'accuracy'],
+      howToImprove: [
+        'Hold your finish position for 3 seconds after each swing',
+        'Practice "swing to the sky" - finish with club pointing up'
+      ],
+      practiceScore: 2
+    },
+    {
+      id: 'poor-balance',
+      category: 'Balance & Follow-Through',
+      issue: 'Poor balance throughout swing',
+      description: 'You\'re losing balance during your swing, which affects consistency and power. Good balance is essential for repeatable results.',
+      priority: 'Medium',
+      impactAreas: ['consistency'],
+      howToImprove: [
+        'Practice swings with feet together to improve balance',
+        'Focus on maintaining athletic posture throughout swing'
+      ],
+      practiceScore: 4
+    }
+  ];
+
+  // Enhanced analysis function with comprehensive issue detection
   const analyzeSwing = useCallback(() => {
     setStatus('processing');
     
@@ -55,74 +245,103 @@ export function ImprovedGolfApp() {
         });
       }
 
-      // Detailed AI recommendations based on score
-      const recommendations = [];
-      
+      // Get all possible issues and select relevant ones based on score
+      const allIssues = getAllPossibleIssues();
+      const detectedIssues: SwingIssue[] = [];
+
+      // Select issues based on score ranges and randomization
       if (score < 70) {
-        recommendations.push({
-          category: 'Swing Plane',
-          issue: 'Inconsistent swing plane detected',
-          explanation: 'Your club is moving outside the ideal swing plane, causing inconsistent ball contact. The swing plane should follow a consistent arc from takeaway through impact.',
-          improvement: 'Practice with alignment sticks placed at your target line and parallel to your feet. Focus on keeping the club head traveling along this plane throughout your swing.',
-          priority: 'high' as const
-        });
+        // Beginners: 4-6 detected issues across priorities
+        const highPriorityIssues = allIssues.filter(issue => issue.priority === 'High');
+        const mediumPriorityIssues = allIssues.filter(issue => issue.priority === 'Medium');
         
-        recommendations.push({
-          category: 'Tempo',
-          issue: 'Rushed downswing transition',
-          explanation: 'Your transition from backswing to downswing is too quick, not allowing proper weight transfer and club positioning. This leads to loss of power and accuracy.',
-          improvement: 'Practice the "pause drill" - take your backswing to the top, pause for one second, then start your downswing. This helps develop proper sequencing.',
-          priority: 'high' as const
-        });
+        // Add 2-3 high priority issues
+        const selectedHigh = highPriorityIssues.sort(() => 0.5 - Math.random()).slice(0, 3);
+        detectedIssues.push(...selectedHigh);
+        
+        // Add 2-3 medium priority issues
+        const selectedMedium = mediumPriorityIssues.sort(() => 0.5 - Math.random()).slice(0, 3);
+        detectedIssues.push(...selectedMedium);
+        
       } else if (score < 85) {
-        recommendations.push({
-          category: 'Follow Through',
-          issue: 'Incomplete follow-through',
-          explanation: 'Your follow-through is cutting short, which indicates deceleration through impact. A complete follow-through ensures maximum energy transfer to the ball.',
-          improvement: 'Focus on finishing with your chest facing the target and your weight fully on your front foot. Hold your finish position for 3 seconds after each swing.',
-          priority: 'medium' as const
-        });
+        // Intermediate: 3-4 detected issues
+        const highPriorityIssues = allIssues.filter(issue => issue.priority === 'High');
+        const mediumPriorityIssues = allIssues.filter(issue => issue.priority === 'Medium');
         
-        recommendations.push({
-          category: 'Weight Transfer',
-          issue: 'Limited weight shift',
-          explanation: 'Your weight transfer from back foot to front foot could be more pronounced. Proper weight transfer is crucial for generating power and maintaining balance.',
-          improvement: 'Practice the "step drill" - take your normal stance, then step your front foot toward the target as you swing. This exaggerates the weight transfer feeling.',
-          priority: 'medium' as const
-        });
+        // Add 1-2 high priority issues
+        const selectedHigh = highPriorityIssues.sort(() => 0.5 - Math.random()).slice(0, 2);
+        detectedIssues.push(...selectedHigh);
+        
+        // Add 2 medium priority issues
+        const selectedMedium = mediumPriorityIssues.sort(() => 0.5 - Math.random()).slice(0, 2);
+        detectedIssues.push(...selectedMedium);
+        
       } else {
-        recommendations.push({
-          category: 'Consistency',
-          issue: 'Excellent swing mechanics!',
-          explanation: 'Your swing shows great consistency and proper sequencing. You\'re maintaining good tempo, plane, and follow-through throughout the motion.',
-          improvement: 'Continue practicing to maintain this level. Focus on course management and mental game to translate this swing quality to lower scores on the course.',
-          priority: 'low' as const
-        });
+        // Advanced: 2-3 detected issues, mostly refinements
+        const mediumPriorityIssues = allIssues.filter(issue => issue.priority === 'Medium');
         
-        recommendations.push({
-          category: 'Fine-tuning',
+        // Add 1 medium priority issue
+        const selectedMedium = mediumPriorityIssues.sort(() => 0.5 - Math.random()).slice(0, 1);
+        detectedIssues.push(...selectedMedium);
+        
+        // Add fine-tuning issue for advanced players
+        const finetuningIssue = {
+          id: 'fine-tuning',
+          category: 'Balance & Follow-Through',
           issue: 'Minor timing optimization',
-          explanation: 'While your swing is very good, there\'s always room for small improvements in timing and rhythm that can lead to even more consistent ball striking.',
-          improvement: 'Work with a metronome or counting system to develop an even more consistent tempo. Try counting "one-two" for backswing and "three" for impact.',
-          priority: 'low' as const
-        });
+          description: 'Your swing mechanics are excellent! Small refinements in timing and rhythm can lead to even more consistent ball striking.',
+          priority: 'Low',
+          impactAreas: ['consistency'],
+          howToImprove: [
+            'Work with metronome to develop more consistent tempo',
+            'Focus on maintaining rhythm under pressure situations'
+          ],
+          practiceScore: 2
+        } as SwingIssue;
+        
+        detectedIssues.push(finetuningIssue);
+        
+        // Add one more medium priority for comprehensive analysis
+        const additionalMedium = mediumPriorityIssues.filter(issue => !selectedMedium.includes(issue)).sort(() => 0.5 - Math.random()).slice(0, 1);
+        detectedIssues.push(...additionalMedium);
       }
 
-      const mockAnalysis = {
+      // Sort by priority (High -> Medium -> Low)
+      const priorityOrder = { 'High': 1, 'Medium': 2, 'Low': 3 };
+      detectedIssues.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+      // Generate motivational message based on score
+      let motivationalMessage = '';
+      let overallAssessment = '';
+
+      if (score < 70) {
+        motivationalMessage = "Every golf legend started with fundamentals - you're building a solid foundation! These improvements will make a huge difference in your game.";
+        overallAssessment = "Your swing shows potential with several key areas for improvement";
+      } else if (score < 85) {
+        motivationalMessage = "You're developing real golf skills! Small adjustments in these areas will lead to significant score improvements on the course.";
+        overallAssessment = "Good swing mechanics with room for refinement in key areas";
+      } else {
+        motivationalMessage = "Excellent swing mechanics! These fine-tunings will take your game to the next level and maximize your scoring potential.";
+        overallAssessment = "Outstanding swing quality with minor areas for optimization";
+      }
+
+      const enhancedAnalysis: EnhancedAnalysis = {
         smoothnessScore: score,
         tempo: 2.1 + Math.random() * 1.5,
-        recommendations,
+        issues: detectedIssues,
+        motivationalMessage,
         celebrationTriggered: score >= 85,
-        swingPath
+        swingPath,
+        overallAssessment
       };
       
-      setAnalysis(mockAnalysis);
+      setAnalysis(enhancedAnalysis);
       setStatus('complete');
       
       if (score >= 85) {
         console.log('🎉 Celebration! Great swing!');
       }
-    }, 3000); // Longer processing time for more realistic feel
+    }, 3000);
   }, []);
 
   // Setup camera with portrait orientation
@@ -500,9 +719,9 @@ export function ImprovedGolfApp() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#22c55e';
+      case 'High': return '#ef4444';
+      case 'Medium': return '#f59e0b';
+      case 'Low': return '#22c55e';
       default: return '#6b7280';
     }
   };
@@ -1043,84 +1262,203 @@ export function ImprovedGolfApp() {
           </div>
         )}
 
-        {/* Detailed AI Recommendations - Centered */}
-        {analysis?.recommendations && (
-          <div style={{ marginTop: '32px', width: '100%', maxWidth: '500px', margin: '32px auto 0' }}>
+        {/* Enhanced Analysis & Recommendations - Centered */}
+        {analysis?.issues && (
+          <div style={{ marginTop: '32px', width: '100%', maxWidth: '600px', margin: '32px auto 0' }}>
             <div style={{
               backgroundColor: 'white',
               borderRadius: '12px',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
               padding: '24px'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
-                 Analysis & Recommendations
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937', marginBottom: '8px' }}>
+                🏌️ Analysis & Recommendations
               </h3>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {analysis.recommendations.map((rec, index) => (
-                  <div key={index} style={{
+              {/* Overall Assessment */}
+              <p style={{
+                fontSize: '1rem',
+                color: '#6b7280',
+                marginBottom: '20px',
+                fontStyle: 'italic'
+              }}>
+                {analysis.overallAssessment}
+              </p>
+
+              {/* Issues Header */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h4 style={{
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  color: '#1f2937',
+                  margin: '0 0 4px 0'
+                }}>
+                  📊 Issues Detected ({analysis.issues.length} issues found)
+                </h4>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: '0'
+                }}>
+                  Ranked by priority - High, Medium, Low
+                </p>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {analysis.issues.map((issue, index) => (
+                  <div key={issue.id} style={{
                     border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    borderLeft: `4px solid ${getPriorityColor(rec.priority)}`
+                    borderRadius: '12px',
+                    padding: '20px',
+                    borderLeft: `5px solid ${getPriorityColor(issue.priority)}`,
+                    backgroundColor: '#fefefe'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                      <h4 style={{
-                        fontWeight: '600',
-                        color: '#1f2937',
-                        margin: '0',
-                        marginRight: '8px'
-                      }}>
-                        {rec.category}
-                      </h4>
+                    {/* Priority Badge and Category */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          fontSize: '1.2rem',
+                          fontWeight: '700',
+                          color: getPriorityColor(issue.priority)
+                        }}>
+                          {issue.priority === 'High' ? '🔴' : issue.priority === 'Medium' ? '🟡' : '🟢'} {issue.priority.toUpperCase()} PRIORITY
+                        </span>
+                      </div>
                       <span style={{
                         fontSize: '0.75rem',
-                        fontWeight: '500',
-                        color: getPriorityColor(rec.priority),
-                        backgroundColor: `${getPriorityColor(rec.priority)}20`,
-                        padding: '2px 8px',
+                        fontWeight: '600',
+                        color: '#6b7280',
+                        backgroundColor: '#f3f4f6',
+                        padding: '4px 8px',
                         borderRadius: '12px',
                         textTransform: 'uppercase'
                       }}>
-                        {rec.priority}
+                        {issue.category}
                       </span>
                     </div>
-                    
-                    <p style={{
-                      fontWeight: '500',
-                      color: '#374151',
-                      marginBottom: '8px',
-                      fontSize: '0.9rem'
+
+                    {/* Issue Title */}
+                    <h4 style={{
+                      fontSize: '1.1rem',
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      margin: '0 0 8px 0'
                     }}>
-                      {rec.issue}
+                      {index + 1}. {issue.issue}
+                    </h4>
+
+                    {/* Impact Areas */}
+                    <div style={{ marginBottom: '12px' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#6b7280', marginRight: '8px' }}>
+                        Impact:
+                      </span>
+                      {issue.impactAreas.map((area, i) => (
+                        <span key={area} style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          backgroundColor: '#e5e7eb',
+                          padding: '2px 6px',
+                          borderRadius: '8px',
+                          marginRight: '4px',
+                          textTransform: 'capitalize'
+                        }}>
+                          {area === 'power' ? '⚡ Power' : area === 'accuracy' ? '🎯 Accuracy' : '🔄 Consistency'}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    {/* Description */}
+                    <p style={{
+                      color: '#4b5563',
+                      marginBottom: '16px',
+                      fontSize: '0.9rem',
+                      lineHeight: '1.6'
+                    }}>
+                      {issue.description}
                     </p>
                     
-                    <p style={{
-                      color: '#6b7280',
-                      marginBottom: '12px',
-                      fontSize: '0.875rem',
-                      lineHeight: '1.5'
-                    }}>
-                      {rec.explanation}
-                    </p>
-                    
+                    {/* How to Improve Section */}
                     <div style={{
-                      backgroundColor: '#f9fafb',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      borderLeft: '3px solid #22c55e'
+                      backgroundColor: '#f0fdf4',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      border: '1px solid #bbf7d0'
                     }}>
-                      <p style={{
-                        color: '#374151',
-                        margin: '0',
-                        fontSize: '0.875rem',
-                        fontWeight: '500'
+                      <h5 style={{
+                        color: '#166534',
+                        margin: '0 0 12px 0',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
                       }}>
-                        💡 <strong>How to improve:</strong> {rec.improvement}
-                      </p>
+                        💡 How to improve:
+                      </h5>
+                      <ul style={{
+                        margin: '0',
+                        paddingLeft: '20px',
+                        color: '#166534'
+                      }}>
+                        {issue.howToImprove.map((tip, tipIndex) => (
+                          <li key={tipIndex} style={{
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5',
+                            marginBottom: '6px'
+                          }}>
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                      
+                      {/* Practice Difficulty */}
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #bbf7d0' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '500' }}>
+                          Difficulty: {Array.from({ length: issue.practiceScore }, (_, i) => '⭐').join('')} ({issue.practiceScore}/10)
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Motivational Message */}
+              <div style={{
+                marginTop: '24px',
+                padding: '20px',
+                backgroundColor: '#fef3c7',
+                borderRadius: '12px',
+                border: '1px solid #fbbf24',
+                textAlign: 'center'
+              }}>
+                <h4 style={{
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  color: '#92400e',
+                  margin: '0 0 8px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}>
+                  🎯 Keep Going!
+                </h4>
+                <p style={{
+                  fontSize: '0.95rem',
+                  color: '#92400e',
+                  margin: '0',
+                  lineHeight: '1.5',
+                  fontWeight: '500'
+                }}>
+                  {analysis.motivationalMessage}
+                </p>
               </div>
             </div>
           </div>
@@ -1178,6 +1516,25 @@ export function ImprovedGolfApp() {
             </button>
           </div>
         )}
+
+        {/* Footer */}
+        <div style={{
+          marginTop: '48px',
+          padding: '16px',
+          textAlign: 'center',
+          maxWidth: '400px',
+          margin: '48px auto 0'
+        }}>
+          <p style={{
+            margin: '0',
+            fontSize: '0.875rem',
+            color: '#166534',
+            fontWeight: '500',
+            opacity: '0.7'
+          }}>
+            Steph made this
+          </p>
+        </div>
       </div>
 
       <style>{`

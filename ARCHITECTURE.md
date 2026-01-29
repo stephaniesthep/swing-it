@@ -135,7 +135,7 @@ app/
 
 ## Environment Variables
 ```
-OPENROUTER_API_KEY=<set via environment variable>
+OPENROUTER_API_KEY=<set via environment variables>
 ```
 
 ## Performance Targets

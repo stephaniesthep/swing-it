@@ -135,8 +135,7 @@ app/
 
 ## Environment Variables
 ```
-OPENROUTER_API_KEY=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
-VITE_APP_NAME=Golf Swing Analyzer
+OPENROUTER_API_KEY=<set via environment variable>
 ```
 
 ## Performance Targets
